@@ -1,0 +1,147 @@
+# Taller 7 - Solicitudes avanzadas
+# Cliente HTTP: extensión "REST Client" de VS Code (usa # @name para encadenar respuestas).
+# En IntelliJ / Postman copia los UUID a mano en las variables de abajo.
+# Ejecutar en orden, con la API corriendo (mvn spring-boot:run) y la BD hotel_reservas_db creada.
+# Nota: el número de habitación y el email son únicos; para repetir la prueba cámbialos o limpia la BD.
+
+@host = http://localhost:8080
+
+### ------------------------------------------------------------------
+### 0. PREPARACIÓN: datos base (no forman parte de las 4 evidencias)
+### ------------------------------------------------------------------
+
+# @name crearCliente
+POST {{host}}/api/clientes
+Content-Type: application/json
+
+{
+  "nombre": "Ana Gómez",
+  "email": "ana.gomez@correo.com"
+}
+
+###
+@clienteId = {{crearCliente.response.body.$.id}}
+
+# @name crearEstandar
+POST {{host}}/api/habitaciones/estandar
+Content-Type: application/json
+
+{
+  "numero": "P01-101",
+  "precioPorNoche": 80.0,
+  "capacidadMaxima": 2,
+  "camasIndividuales": 2
+}
+
+###
+@estandarId = {{crearEstandar.response.body.$.id}}
+
+### ------------------------------------------------------------------
+### EVIDENCIA 1 - Creación de Suite Presidencial  -> 201 Created + ID generado
+### ------------------------------------------------------------------
+
+# @name crearSuite
+POST {{host}}/api/habitaciones/suites
+Content-Type: application/json
+
+{
+  "numero": "P05-501",
+  "precioPorNoche": 350.0,
+  "capacidadMaxima": 2,
+  "jacuzziPrivado": true,
+  "incluyeMayordomo": true
+}
+
+###
+@suiteId = {{crearSuite.response.body.$.id}}
+
+### ------------------------------------------------------------------
+### 0b. PREPARACIÓN: dos reservas para el cliente (suite 2 noches = 700, estándar 1 noche = 80)
+### ------------------------------------------------------------------
+
+POST {{host}}/api/reservas
+Content-Type: application/json
+
+{
+  "clienteId": "{{clienteId}}",
+  "habitacionId": "{{suiteId}}",
+  "fechaInicio": "2026-11-10T14:00:00",
+  "fechaFin": "2026-11-12T14:00:00"
+}
+
+###
+POST {{host}}/api/reservas
+Content-Type: application/json
+
+{
+  "clienteId": "{{clienteId}}",
+  "habitacionId": "{{estandarId}}",
+  "fechaInicio": "2026-12-01T14:00:00",
+  "fechaFin": "2026-12-02T14:00:00"
+}
+
+### ------------------------------------------------------------------
+### EVIDENCIA 2 - Consulta polimórfica -> array con "tipo": "ESTANDAR" y "tipo": "SUITE"
+### ------------------------------------------------------------------
+
+GET {{host}}/api/habitaciones
+
+### ------------------------------------------------------------------
+### EVIDENCIA 3 - Resumen ejecutivo del cliente
+### total gastado esperado = 780.0, totalReservasRealizadas = 2, lista embebida limpia
+### ------------------------------------------------------------------
+
+GET {{host}}/api/clientes/{{clienteId}}/resumen
+
+### ------------------------------------------------------------------
+### EVIDENCIA 4 - Actualización selectiva (PATCH): solo cambia el nombre
+### ------------------------------------------------------------------
+
+PATCH {{host}}/api/clientes/{{clienteId}}
+Content-Type: application/json
+
+{
+  "nombre": "Nuevo Nombre Modificado"
+}
+
+### Verificación: email, activo y penalizaciones deben seguir iguales
+GET {{host}}/api/clientes/{{clienteId}}/resumen
+
+### ------------------------------------------------------------------
+### EXTRAS (semántica HTTP): errores esperados
+### ------------------------------------------------------------------
+
+### 400 - número de habitación con formato inválido
+POST {{host}}/api/habitaciones/suites
+Content-Type: application/json
+
+{
+  "numero": "501",
+  "precioPorNoche": 350.0,
+  "capacidadMaxima": 2,
+  "jacuzziPrivado": true,
+  "incluyeMayordomo": true
+}
+
+### 400 - PATCH con email inválido
+PATCH {{host}}/api/clientes/{{clienteId}}
+Content-Type: application/json
+
+{
+  "email": "no-es-un-email"
+}
+
+### 404 - cliente inexistente
+GET {{host}}/api/clientes/00000000-0000-0000-0000-000000000000/resumen
+
+### 409 - número de habitación duplicado (ejecuta de nuevo la Evidencia 1)
+POST {{host}}/api/habitaciones/suites
+Content-Type: application/json
+
+{
+  "numero": "P05-501",
+  "precioPorNoche": 350.0,
+  "capacidadMaxima": 2,
+  "jacuzziPrivado": true,
+  "incluyeMayordomo": true
+}

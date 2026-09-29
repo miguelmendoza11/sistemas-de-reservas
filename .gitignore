@@ -1,0 +1,6 @@
+target/
+reservas_log.txt
+*.log
+.idea/
+.vscode/
+nbproject/private/
